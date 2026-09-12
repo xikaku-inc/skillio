@@ -64,6 +64,19 @@ exactly which env var to set. The UI surfaces that as "Coach not configured".
 The slice never invents a credential and never treats a CLI/session token as an
 application key.
 
+## Realtime relay (full-duplex WebSocket, server-owned session)
+
+Beyond the one-shot HTTP turn there is a **persistent realtime relay** at
+`/ws/realtime`, driven by a narrow local protocol (`shared/realtime.ts`) with a
+**server-side provider** — either the default OpenAI Realtime session
+(`server/realtime/REALTIME.md`) or the parallel **Deepgram Agent** provider
+(`server/realtime/DEEPGRAM.md`), selected with
+`VOICE_DIRECTOR_REALTIME_PROVIDER=deepgram`. Both share the same runbook
+authority (only an explicit `confirm` advances a step) and the same
+missing-credential contract. Provider credentials live on the server and never
+appear in a local frame; `GET /api/health` reports `realtime` (the selected
+provider) and `deepgram` readiness.
+
 ## Endpoints
 
 | Route | Body | Returns |
@@ -74,6 +87,7 @@ application key.
 | `GET /api/scene/:sessionId` | — | `{ runbook, layout }` — versioned task-state + scene payload for a remote Unity process |
 | `GET /api/health` | — | provider readiness, no secrets |
 | `POST /copilot` | CopilotKit runtime | Copilot sidecar chat (mounted only when credentialed) |
+| `WS /ws/realtime` | JSON frames (`shared/realtime.ts`) | full-duplex realtime relay — provider-selected (OpenAI or Deepgram), model/`confirm` runbook |
 
 ## Scene / task-state boundary (remote Unity, no local Unity dependency)
 

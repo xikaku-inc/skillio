@@ -7,6 +7,12 @@ reuses the same server-side `OPENAI_API_KEY`, the same runbook/scene vocabulary
 (`shared/scene.ts`, `@skillio/voice-coach`), and the same missing-credential
 contract. The one-shot HTTP routes are unchanged.
 
+There is a **parallel server-side realtime provider**: `DEEPGRAM.md` describes
+the Deepgram Agent implementation behind the same local protocol and runbook,
+selected with `VOICE_DIRECTOR_REALTIME_PROVIDER=deepgram` (default `openai`,
+byte-for-byte this document). Everything below describes the default OpenAI
+boundaries; the Deepgram page calls out exactly what differs.
+
 ## Three boundaries
 
 ```
@@ -75,6 +81,7 @@ Browser (future client)          voice-director server            OpenAI Realtim
 | Env var | Required | Default | Meaning |
 | --- | --- | --- | --- |
 | `OPENAI_API_KEY` | **yes** | — | shared server-only credential (same as the HTTP slice) |
+| `VOICE_DIRECTOR_REALTIME_PROVIDER` | no | `openai` | `deepgram` selects the parallel Deepgram Agent relay (see `DEEPGRAM.md`) |
 | `VOICE_DIRECTOR_REALTIME_MODEL` | no | `gpt-realtime-2.1` | model served by the Realtime API (`gpt-realtime` family) |
 | `VOICE_DIRECTOR_REALTIME_VOICE` | no | `alloy` | provider voice |
 | `VOICE_DIRECTOR_REALTIME_WS_URL` | no | derived: baseUrl https→wss + `/realtime` | Realtime WebSocket endpoint (proxies/gateways) |
@@ -110,7 +117,8 @@ connection.
 shared/realtime.ts                  local protocol types (client + server import)
 server/realtime/provider.ts         RealtimeProvider boundary + OpenAI WS adapter (key lives here)
 server/realtime/relay.ts            runbook ownership + local/provider codec (deterministic)
-server/realtime/ws-server.ts        /ws/realtime gateway (bytes <-> relay)
-server/realtime/tests/relay.test.ts    fake-provider relay tests
-server/realtime/tests/ws-server.test.ts gateway wire tests
+server/realtime/ws-server.ts        /ws/realtime gateway + provider selector (createGatewayRelay)
+server/realtime/deepgram/           parallel Deepgram Agent provider + relay (see DEEPGRAM.md)
+server/realtime/tests/              OpenAI relay tests (fake provider + wire)
+server/realtime/deepgram/tests/     Deepgram relay tests (fake provider + wire)
 ```

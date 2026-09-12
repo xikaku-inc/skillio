@@ -9,6 +9,9 @@ export type ProviderStatus = 'ready' | 'missing-credential';
 
 export type VoiceStatus = 'idle' | 'connecting' | 'listening' | 'processing' | 'speaking';
 
+/** Which provider the realtime relay gateway is wired to. */
+export type RealtimeProviderName = 'openai' | 'deepgram';
+
 export interface HealthResponse {
   ok: boolean;
   provider: ProviderStatus;
@@ -16,6 +19,10 @@ export interface HealthResponse {
   voice: string;
   copilot: boolean;
   slack: boolean;
+  /** Selected realtime provider (defaults to `openai`). */
+  realtime?: RealtimeProviderName;
+  /** Deepgram readiness, present when the realtime provider is `deepgram`. */
+  deepgram?: ProviderStatus;
 }
 
 export interface StartRequest {

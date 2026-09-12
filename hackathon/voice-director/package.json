@@ -10,7 +10,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
-    "test": "tsx --test server/tests/*.test.ts server/realtime/tests/*.test.ts"
+    "test": "tsx --test server/tests/*.test.ts server/realtime/tests/*.test.ts server/realtime/deepgram/tests/*.test.ts"
   },
   "dependencies": {
     "@copilotkit/react-core": "1.71.1",

@@ -14,6 +14,8 @@ import type { RealtimeClientMessage, RealtimeServerMessage } from '../../shared/
 import type { DirectorConfig } from '../config';
 import { createRealtimeProvider, type RealtimeProvider } from './provider';
 import { RealtimeRelay, type RealtimeRelayConfig, type RealtimeRelayDeps } from './relay';
+import { createDeepgramRelay } from './deepgram/relay';
+import type { DeepgramProvider } from './deepgram/provider';
 
 export const REALTIME_WS_PATH = '/ws/realtime';
 
@@ -24,6 +26,18 @@ export const RELAY_CLOSE = {
   /** Client sent a frame that is not a valid local protocol message. */
   BAD_MESSAGE: 1008,
 } as const;
+
+/**
+ * The relay surface both providers expose. The gateway never touches the
+ * provider or credential — it moves bytes between the socket and whichever
+ * relay (OpenAI or Deepgram) the config selects.
+ */
+export interface RealtimeRelayLike {
+  onLocal(listener: (message: RealtimeServerMessage) => void): () => void;
+  handleClientMessage(message: RealtimeClientMessage): Promise<void>;
+  close(): void;
+  reportProtocolError(message: string): void;
+}
 
 export function buildRelayDeps(cfg: DirectorConfig, provider?: RealtimeProvider): RealtimeRelayDeps {
   const config: RealtimeRelayConfig = {
@@ -37,22 +51,35 @@ export function buildRelayDeps(cfg: DirectorConfig, provider?: RealtimeProvider)
 }
 
 /**
+ * Select the relay implementation from config. Default (`openai`) preserves the
+ * existing OpenAI-realtime behavior byte-for-byte; `deepgram` uses the parallel
+ * server-side Deepgram Agent provider. `provider` is the same injection seam
+ * tests use for either provider.
+ */
+export function createGatewayRelay(cfg: DirectorConfig, provider?: RealtimeProvider | DeepgramProvider): RealtimeRelayLike {
+  if (cfg.realtime.provider === 'deepgram') {
+    return createDeepgramRelay(cfg, provider as DeepgramProvider | undefined);
+  }
+  return new RealtimeRelay(buildRelayDeps(cfg, provider as RealtimeProvider | undefined));
+}
+
+/**
  * Attach the realtime relay gateway to an existing HTTP server. Additive to the
  * one-shot HTTP routes: existing routes keep their exact behavior; this only
  * claims the `/ws/realtime` upgrade path.
  *
  * `provider` is an injection seam for tests; production callers omit it and the
- * real OpenAI-backed provider (createRealtimeProvider) is used.
+ * configured real provider (OpenAI or Deepgram, per cfg.realtime.provider) is used.
  */
 export function attachRealtimeRelayServer(
   httpServer: Server,
   cfg: DirectorConfig,
-  provider?: RealtimeProvider,
+  provider?: RealtimeProvider | DeepgramProvider,
 ): WebSocketServer {
   const wss = new WebSocketServer({ server: httpServer, path: REALTIME_WS_PATH });
 
   wss.on('connection', (socket: WebSocket) => {
-    const relay = new RealtimeRelay(buildRelayDeps(cfg, provider));
+    const relay = createGatewayRelay(cfg, provider);
 
     relay.onLocal((message: RealtimeServerMessage) => {
       if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
@@ -73,7 +100,7 @@ export function attachRealtimeRelayServer(
   return wss;
 }
 
-async function handleRawMessage(raw: WebSocket.RawData, relay: RealtimeRelay): Promise<void> {
+async function handleRawMessage(raw: WebSocket.RawData, relay: RealtimeRelayLike): Promise<void> {
   const text = raw.toString();
   let message: RealtimeClientMessage;
   try {

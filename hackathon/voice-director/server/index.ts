@@ -95,6 +95,8 @@ function startExpress(cfg: DirectorConfig): {
       voice: cfg.voice,
       copilot: Boolean(cfg.apiKey),
       slack: Boolean(cfg.slack.appToken && cfg.slack.botToken),
+      realtime: cfg.realtime.provider,
+      deepgram: cfg.deepgram.apiKey ? 'ready' : 'missing-credential',
     };
     res.json(body);
   });
@@ -294,7 +296,11 @@ export async function main(env: Record<string, string | undefined> = process.env
     console.log(`voice-director server: http://localhost:${cfg.port}`);
     console.log(`  provider: ${cfg.apiKey ? 'ready' : 'missing-credential (set OPENAI_API_KEY to enable provider calls)'}`);
     console.log(`  model: ${cfg.model} | voice: ${cfg.voice}`);
-    console.log(`  realtime relay: ws://localhost:${cfg.port}${REALTIME_WS_PATH} (model ${cfg.realtime.model}, ${cfg.apiKey ? 'ready' : 'missing-credential'})`);
+    const realtimeReady =
+      cfg.realtime.provider === 'deepgram' ? Boolean(cfg.deepgram.apiKey) : Boolean(cfg.apiKey);
+    console.log(
+      `  realtime relay: ws://localhost:${cfg.port}${REALTIME_WS_PATH} (provider ${cfg.realtime.provider}, model ${cfg.realtime.model}, ${realtimeReady ? 'ready' : 'missing-credential'})`,
+    );
     console.log(`  copilot sidecar: ${cfg.apiKey ? 'mounted at /copilot' : 'disabled'}`);
     console.log(`  CORS allowed origin: ${cfg.allowedOrigin}`);
   });
