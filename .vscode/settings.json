@@ -1,0 +1,6 @@
+{
+  "git.autofetch": true,
+  "git.autofetchPeriod": 180,
+  "git.pruneOnFetch": true,
+  "git.rebaseWhenSync": true
+}
