@@ -11,6 +11,7 @@
 // they are never computed into client responses or bundled into the browser.
 // A missing credential is reported via health + explicit 503 codes — never invented.
 import { randomUUID } from 'node:crypto';
+import { createServer } from 'node:http';
 import express from 'express';
 import { BuiltInAgent, CopilotRuntime, createCopilotEndpointExpress } from '@copilotkit/runtime/v2';
 import { confirmSpec, createCoach, type CoachPhase, type CoachState, type ScrewPosition } from '@skillio/voice-coach';
@@ -18,6 +19,8 @@ import { MissingCredentialError, ProviderError, loadConfig, type DirectorConfig 
 import { createProvider, type DialogueLine, type DirectorProvider } from './director';
 import { startSlack } from './slack';
 import { deriveSceneLayout, feedbackSeed, RUNBOOK_VERSION, type RunbookState } from '../shared/scene';
+import { attachRealtimeRelayServer, REALTIME_WS_PATH } from './realtime/ws-server';
+
 import type {
   ApiError,
   StartRequest,
@@ -282,10 +285,16 @@ export async function main(env: Record<string, string | undefined> = process.env
     console.log('slack: bot skipped (set SLACK_APP_TOKEN + SLACK_BOT_TOKEN to enable)');
   }
 
-  app.listen(cfg.port, () => {
+  const httpServer = createServer(app);
+  // Realtime relay gateway: claims ONLY the /ws/realtime upgrade path. The
+  // one-shot HTTP routes above are unchanged; this is additive by design.
+  attachRealtimeRelayServer(httpServer, cfg);
+
+  httpServer.listen(cfg.port, () => {
     console.log(`voice-director server: http://localhost:${cfg.port}`);
     console.log(`  provider: ${cfg.apiKey ? 'ready' : 'missing-credential (set OPENAI_API_KEY to enable provider calls)'}`);
     console.log(`  model: ${cfg.model} | voice: ${cfg.voice}`);
+    console.log(`  realtime relay: ws://localhost:${cfg.port}${REALTIME_WS_PATH} (model ${cfg.realtime.model}, ${cfg.apiKey ? 'ready' : 'missing-credential'})`);
     console.log(`  copilot sidecar: ${cfg.apiKey ? 'mounted at /copilot' : 'disabled'}`);
     console.log(`  CORS allowed origin: ${cfg.allowedOrigin}`);
   });
