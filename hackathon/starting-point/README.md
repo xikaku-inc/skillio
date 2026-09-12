@@ -1,5 +1,9 @@
 # Starting points — code we've begun, where to jump in
 
+> PROVISIONAL (task-qpeek): the official event starter kit is not yet released.
+> When it drops, vendor it into `/sources` and rebase below onto it. Until then,
+> build on these — the kit may land day-of with no time to absorb it.
+
 All paths relative to repo root. Nothing below is finished; each entry says
 what exists, what's stubbed, and the first command to run.
 
