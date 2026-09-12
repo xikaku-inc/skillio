@@ -29,6 +29,18 @@ export interface SlackConfig {
   botToken: string | null;
 }
 
+/** Realtime relay configuration — same credential (OPENAI_API_KEY), separate endpoint. */
+export interface RealtimeConfig {
+  /** Model family is `gpt-realtime-*`; only the model prefix strings are docs-safe. */
+  model: string;
+  voice: string;
+  /** Explicit Realtime WebSocket URL override; else derived from baseUrl (https -> wss + /realtime). */
+  wsUrl: string | null;
+  /** Enable input_audio_transcription so the relay can emit operator transcripts. */
+  transcription: boolean;
+  transcriptionModel: string | null;
+}
+
 export interface DirectorConfig {
   /** null = not configured. Presence is required (and verified) before any provider call. */
   apiKey: string | null;
@@ -39,14 +51,23 @@ export interface DirectorConfig {
   baseUrl: string;
   defaultJob: string;
   slack: SlackConfig;
+  realtime: RealtimeConfig;
 }
 
 const DEFAULT_MODEL = 'gpt-4o-audio-preview';
 const DEFAULT_VOICE = 'alloy';
+const DEFAULT_REALTIME_MODEL = 'gpt-realtime-2.1';
+const DEFAULT_REALTIME_TRANSCRIPTION_MODEL = 'gpt-4o-mini-transcribe';
 
 function envValue(env: Record<string, string | undefined>, key: string): string | null {
   const v = env[key];
   return v && v.trim().length > 0 ? v.trim() : null;
+}
+
+function envBoolean(env: Record<string, string | undefined>, key: string, fallback: boolean): boolean {
+  const v = envValue(env, key);
+  if (v === null) return fallback;
+  return v === 'true' || v === '1' || v === 'yes';
 }
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): DirectorConfig {
@@ -61,6 +82,13 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     slack: {
       appToken: envValue(env, 'SLACK_APP_TOKEN'),
       botToken: envValue(env, 'SLACK_BOT_TOKEN'),
+    },
+    realtime: {
+      model: envValue(env, 'VOICE_DIRECTOR_REALTIME_MODEL') ?? DEFAULT_REALTIME_MODEL,
+      voice: envValue(env, 'VOICE_DIRECTOR_REALTIME_VOICE') ?? DEFAULT_VOICE,
+      wsUrl: envValue(env, 'VOICE_DIRECTOR_REALTIME_WS_URL'),
+      transcription: envBoolean(env, 'VOICE_DIRECTOR_REALTIME_TRANSCRIPTION', true),
+      transcriptionModel: envValue(env, 'VOICE_DIRECTOR_REALTIME_TRANSCRIPTION_MODEL') ?? DEFAULT_REALTIME_TRANSCRIPTION_MODEL,
     },
   };
 }
