@@ -1,0 +1,11 @@
+{
+  "name": "@skillio/hackathon-starter-minimal",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@skillio/mcp-protocol": "workspace:*",
+    "@skillio/mcp-client": "workspace:*",
+    "@skillio/ui": "workspace:*"
+  }
+}
