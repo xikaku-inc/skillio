@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -18,15 +19,52 @@ public class CubeMover : MonoBehaviour
     [SerializeField] private float stepSize = 0.1f; // meters per press; 10 cm default, one cube-length per press
     [SerializeField] private float yawStepDegrees = 5f; // degrees per Z/X press
 
+    [Tooltip("Name shown in the on-screen overlay and Console logs, e.g. Cube or Crosshair.")]
+    [SerializeField] private string displayName = "Cube";
+
+    [Tooltip("Which mover owns the keyboard when Play starts. Tab cycles through all enabled movers.")]
+    [SerializeField] private bool focusedByDefault;
+
     private const float FineFactor = 0.1f; // step multiplier while Shift is held
+
+    // Several objects share the same keyboard scheme; only the focused one reacts to it.
+    private static readonly List<CubeMover> All = new List<CubeMover>();
+    private static CubeMover focused;
+    private static int lastTabFrame = -1;
 
     private Vector3 spawnPosition;
     private Quaternion spawnRotation;
+
+    private void OnEnable()
+    {
+        All.Add(this);
+        if (focused == null || focusedByDefault)
+            focused = this;
+    }
+
+    private void OnDisable()
+    {
+        All.Remove(this);
+        if (focused == this)
+            focused = All.Count > 0 ? All[0] : null;
+    }
 
     private void Start()
     {
         spawnPosition = transform.position;
         spawnRotation = transform.rotation;
+    }
+
+    /// <summary>Tab moves keyboard focus to the next enabled mover. Guarded so that only one
+    /// instance per frame acts on the key press.</summary>
+    private static void HandleFocusCycle(bool tabPressed)
+    {
+        if (!tabPressed || lastTabFrame == Time.frameCount || All.Count == 0)
+            return;
+        lastTabFrame = Time.frameCount;
+        int i = Mathf.Max(0, All.IndexOf(focused));
+        focused = All[(i + 1) % All.Count];
+        Debug.Log("CubeMover: keyboard focus -> " + focused.displayName);
     }
 
     private void Update()
@@ -41,6 +79,12 @@ public class CubeMover : MonoBehaviour
 
         Keyboard keyboard = Keyboard.current;
         if (keyboard == null)
+        {
+            return;
+        }
+
+        HandleFocusCycle(keyboard.tabKey.wasPressedThisFrame);
+        if (focused != this)
         {
             return;
         }
@@ -73,7 +117,7 @@ public class CubeMover : MonoBehaviour
             pos += Vector3.right * step;
             moved = true;
         }
-        if (keyboard.eKey.wasPressedThisFrame || keyboard.pageUpKey.wasPressedThisFrame || keyboard.spaceKey.wasPressedThisFrame)
+        if (keyboard.eKey.wasPressedThisFrame || keyboard.pageUpKey.wasPressedThisFrame)
         {
             pos += Vector3.up * step;
             moved = true;
@@ -120,18 +164,24 @@ public class CubeMover : MonoBehaviour
         if (moved)
         {
             transform.position = pos;
-            Debug.Log("CubeMover: new position = " + pos.ToString("F3"));
+            Debug.Log(displayName + ": new position = " + pos.ToString("F3"));
         }
         if (yawDelta != 0f)
         {
             transform.Rotate(0f, yawDelta, 0f, Space.World);
-            Debug.Log("CubeMover: new yaw = " + transform.eulerAngles.y.ToString("F1") + " deg");
+            Debug.Log(displayName + ": new yaw = " + transform.eulerAngles.y.ToString("F1") + " deg");
         }
 #else
         if (Input.GetMouseButton(1))
         {
             // Right mouse button drives DesktopFlyCamera's look/fly controls;
             // don't also step the cube while flying.
+            return;
+        }
+
+        HandleFocusCycle(Input.GetKeyDown(KeyCode.Tab));
+        if (focused != this)
+        {
             return;
         }
 
@@ -163,7 +213,7 @@ public class CubeMover : MonoBehaviour
             pos += Vector3.right * step;
             moved = true;
         }
-        if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.PageUp) || Input.GetKeyDown(KeyCode.Space))
+        if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.PageUp))
         {
             pos += Vector3.up * step;
             moved = true;
@@ -210,21 +260,26 @@ public class CubeMover : MonoBehaviour
         if (moved)
         {
             transform.position = pos;
-            Debug.Log("CubeMover: new position = " + pos.ToString("F3"));
+            Debug.Log(displayName + ": new position = " + pos.ToString("F3"));
         }
         if (yawDelta != 0f)
         {
             transform.Rotate(0f, yawDelta, 0f, Space.World);
-            Debug.Log("CubeMover: new yaw = " + transform.eulerAngles.y.ToString("F1") + " deg");
+            Debug.Log(displayName + ": new yaw = " + transform.eulerAngles.y.ToString("F1") + " deg");
         }
 #endif
     }
 
     private void OnGUI()
     {
-        GUI.Label(new Rect(10, 10, 520, 62),
-            "Pos: " + transform.position.ToString("F3") + "   Yaw: " + transform.eulerAngles.y.ToString("F1") + " deg   Step: " + stepSize + " m\n" +
-            "WASD/Arrows: move   Down/Up: Q/E, PgDn/PgUp, Ctrl/Space   Z/X: yaw\n" +
+        if (focused != this)
+        {
+            return;
+        }
+
+        GUI.Label(new Rect(10, 10, 560, 62),
+            "[" + displayName + "]  Pos: " + transform.position.ToString("F3") + "   Yaw: " + transform.eulerAngles.y.ToString("F1") + " deg   Step: " + stepSize + " m\n" +
+            "WASD/Arrows: move   Down/Up: Q/E, PgDn/PgUp (Ctrl: down)   Z/X: yaw   Tab: next object   Space: new screw target\n" +
             "Shift: fine (x0.1)   R: reset   1-4: 1mm/1cm/10cm/1m");
     }
 }
